@@ -1,36 +1,71 @@
-// Industrial IoT Environment Monitor - Week 6 Final Submission
-#include <WiFi.h>
-#include <PubSubClient.h> // For MQTT
+/*
+ * Project: Smart Industrial Environment Monitor
+ * Internship: upSkill Campus & UniConverge Technologies (UCT)
+ * File: EnvironmentMonitor.ino
+ */
 
-const char* ssid = "YOUR_WIFI_NAME";
+#include <WiFi.h>
+#include <PubSubClient.h> // MQTT Library
+
+// Network Credentials
+const char* ssid = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
-const char* mqtt_server = "broker.hivemq.com";
+
+// MQTT Broker (Industry standard protocol)
+const char* mqtt_server = "broker.hivemq.com"; 
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 void setup() {
   Serial.begin(115200);
+  
+  // Connect to Wi-Fi
   setup_wifi();
+  
+  // Set MQTT Broker [cite: 45]
   client.setServer(mqtt_server, 1883);
 }
 
 void setup_wifi() {
-  delay(10);
+  Serial.print("Connecting to WiFi...");
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) { delay(500); }
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Connected!");
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    if (client.connect("Jayesh_IoT_Node")) {
+      Serial.println("MQTT Connected");
+    } else {
+      delay(5000);
+    }
+  }
 }
 
 void loop() {
-  if (!client.connected()) { reconnect(); }
+  if (!client.connected()) {
+    reconnect();
+  }
   client.loop();
 
-  // Simulated Sensor Reading for Industrial Benchmarks
-  float temp = random(20, 35); 
-  String payload = "{\"temperature\":" + String(temp) + "}";
-  client.publish("uct/factory/env", (char*) payload.c_str());
+  // 1. Reading Sensors [cite: 93, 100]
+  float temperature = random(22, 30); // Simulated industrial temp
+  float gasLevel = random(100, 400);  // Simulated gas ppm
+
+  // 2. Data Serialization into JSON [cite: 43]
+  String payload = "{\"temp\":" + String(temperature) + ",\"gas\":" + String(gasLevel) + "}";
   
-  // Power Constraint: Enter Deep Sleep
+  // 3. Publish to Cloud Dashboard [cite: 47, 90]
+  client.publish("uct/factory/sensor", (char*) payload.c_str());
+  Serial.println("Data published: " + payload);
+
+  // 4. Performance Constraint: Low Power [cite: 106, 110]
   Serial.println("Entering Deep Sleep to save battery...");
-  esp_deep_sleep_start(); 
+  esp_sleep_enable_timer_wakeup(600 * 1000000); // Sleep for 10 minutes
+  esp_deep_sleep_start();
 }
